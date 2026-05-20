@@ -22,14 +22,14 @@ const char* WIFI_PASSWORD = "sampath577";    // Your hotspot password
 // ----- TOWER B IDENTIFICATION -----
 //#define NODE_ID "ESP32_NODE_02"
 //#define TOWER_LETTER "B"
-//#define TOWER_POSITION_X 0.8
+//#define TOWER_POSITION_X 4
 //#define TOWER_POSITION_Y 0
 
 // ----- TOWER C IDENTIFICATION -----
 #define NODE_ID "ESP32_NODE_03"
 #define TOWER_LETTER "C"
 #define TOWER_POSITION_X 0
-#define TOWER_POSITION_Y 0.6
+#define TOWER_POSITION_Y 3
 
 // ==========================================
 // LED CONFIGURATION
