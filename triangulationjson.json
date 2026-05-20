@@ -1,0 +1,39 @@
+{
+  "nodes": {
+    "ESP32_NODE_01": {
+      "rssi": -52,
+      "distance_m": 1.25,
+      "distance_cm": 125,
+      "timestamp": 1704123456
+    },
+    "ESP32_NODE_02": {
+      "rssi": -50,
+      "distance_m": 1.08,
+      "distance_cm": 108,
+      "timestamp": 1704123457
+    },
+    "ESP32_NODE_03": {
+      "rssi": -48,
+      "distance_m": 1.00,
+      "distance_cm": 100,
+      "timestamp": 1704123458
+    }
+  },
+  "tower_positions": {
+    "A": { "x": 0, "y": 0 },
+    "B": { "x": 4, "y": 0 },
+    "C": { "x": 2, "y": 3 }
+  },
+  "config": {
+    "rssi": {
+      "A": -42,
+      "B": -42,
+      "C": -42,
+      "n": 2.5
+    },
+    "target_position": {
+      "x": 2.0,
+      "y": 1.5
+    }
+  }
+}

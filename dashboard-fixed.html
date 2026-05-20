@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ESP32 Triangulation Dashboard | Real-Time Host Movement Tracking</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1225 100%);
+            color: #fff;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .background-animation {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .gradient-sphere {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.4;
+            animation: float 25s infinite ease-in-out;
+        }
+
+        .sphere-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, #667eea, #764ba2);
+            top: -300px;
+            right: -300px;
+        }
+
+        .sphere-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, #f093fb, #f5576c);
+            bottom: -250px;
+            left: -250px;
+            animation-delay: -7s;
+        }
+
+        .sphere-3 {
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, #4facfe, #00f2fe);
+            top: 50%;
+            left: 30%;
+            transform: translate(-50%, -50%);
+            animation-delay: -14s;
+        }
+
+        .sphere-4 {
+            width: 350px;
+            height: 350px;
+            background: radial-gradient(circle, #ff6b6b, #ee5a24);
+            bottom: 20%;
+            right: 10%;
+            animation-delay: -21s;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            33% {
+                transform: translate(40px, -40px) scale(1.15);
+            }
+
+            66% {
+                transform: translate(-20px, 30px) scale(0.95);
+            }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(15px);
+            border-radius: 24px;
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .logo h1 {
+            font-size: 26px;
+            background: linear-gradient(135deg, #fff, #667eea, #a855f7);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-weight: 700;
+        }
+
+        .logo p {
+            font-size: 12px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(102, 126, 234, 0.7));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-top: 5px;
+        }
+
+        .status-badge {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 6px 16px;
+            border-radius: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.online {
+            background: #4ade80;
+            box-shadow: 0 0 12px #4ade80;
+        }
+
+        .status-dot.offline {
+            background: #ef4444;
+            box-shadow: 0 0 8px #ef4444;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .time {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            font-family: monospace;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.6;
+                transform: scale(1.15);
+            }
+        }
+
+        @keyframes directionPulse {
+            0% {
+                opacity: 0.3;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border-radius: 24px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+            transition: left 0.5s;
+        }
+
+        .stat-card:hover::before {
+            left: 100%;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        .stat-card.no-data {
+            opacity: 0.6;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .card-header h3 {
+            font-size: 16px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .card-icon.blue {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+        }
+
+        .card-icon.green {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+        }
+
+        .card-icon.orange {
+            background: rgba(249, 115, 22, 0.15);
+            color: #f97316;
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.2);
+        }
+
+        .rssi-value {
+            font-size: 44px;
+            font-weight: bold;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+
+        .distance-value {
+            font-size: 24px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .signal-quality {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 50px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .quality-excellent {
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+            border: 1px solid rgba(74, 222, 128, 0.3);
+        }
+
+        .quality-good {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .quality-fair {
+            background: rgba(234, 179, 8, 0.15);
+            color: #eab308;
+            border: 1px solid rgba(234, 179, 8, 0.3);
+        }
+
+        .quality-poor {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .movement-card {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(102, 126, 234, 0.1));
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 16px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .movement-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ef4444;
+        }
+
+        .direction-icon {
+            font-size: 24px;
+            margin: 0 10px;
+            display: inline-block;
+            animation: directionPulse 0.5s ease-in-out;
+        }
+
+        .matrix-section {
+            margin-bottom: 30px;
+            overflow-x: auto;
+        }
+
+        .matrix-title {
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #fff, #667eea);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 15px;
+        }
+
+        .distance-matrix {
+            display: grid;
+            grid-template-columns: auto repeat(4, 1fr);
+            gap: 1px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            min-width: 500px;
+        }
+
+        .matrix-cell {
+            padding: 12px 8px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.3);
+            font-size: 12px;
+            min-width: 70px;
+        }
+
+        .matrix-cell.header {
+            background: rgba(102, 126, 234, 0.2);
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .matrix-cell.row-header {
+            background: rgba(102, 126, 234, 0.15);
+            font-weight: 600;
+        }
+
+        .matrix-cell.diagonal {
+            background: rgba(0, 0, 0, 0.5);
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .matrix-cell.interpolated {
+            background: rgba(74, 222, 128, 0.1);
+            border: 1px solid rgba(74, 222, 128, 0.3);
+        }
+
+        .distances-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .distance-card {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 16px;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            transition: all 0.3s;
+        }
+
+        .distance-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+
+        .distance-card h4 {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 8px;
+        }
+
+        .distance-card .value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .distance-card .unit {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 968px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .distances-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .map-container,
+        .chart-container,
+        .device-status,
+        .logs-section {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border-radius: 24px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .map-title {
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #fff, #667eea);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .map-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .map-btn {
+            background: rgba(102, 126, 234, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 12px;
+        }
+
+        .map-btn:hover {
+            background: #667eea;
+            transform: scale(1.02);
+        }
+
+        .map-btn.active {
+            background: #667eea;
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.5);
+        }
+
+        .map-canvas-wrapper {
+            position: relative;
+            overflow: auto;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 16px;
+            max-height: 550px;
+        }
+
+        .map-canvas-wrapper::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        .map-canvas-wrapper::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .map-canvas-wrapper::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 10px;
+        }
+
+        #triangulationCanvas {
+            display: block;
+            cursor: grab;
+            background: #0a0e27;
+            width: 100%;
+            height: auto;
+        }
+
+        #triangulationCanvas:active {
+            cursor: grabbing;
+        }
+
+        .zoom-info {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-family: monospace;
+        }
+
+        .status-table {
+            width: 100%;
+            margin-top: 15px;
+            border-collapse: collapse;
+        }
+
+        .status-table th,
+        .status-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .status-table th {
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: 500;
+            font-size: 12px;
+        }
+
+        .device-online {
+            color: #4ade80;
+        }
+
+        .device-offline {
+            color: #ef4444;
+        }
+
+        .logs-container {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 15px;
+            font-family: monospace;
+            font-size: 11px;
+        }
+
+        .log-entry {
+            padding: 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .log-time {
+            color: #667eea;
+            margin-right: 10px;
+        }
+
+        .log-error {
+            color: #ef4444;
+        }
+
+        .log-success {
+            color: #4ade80;
+        }
+
+        .log-movement {
+            color: #f97316;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #667eea;
+            border-right-color: #764ba2;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .debug-info {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.3);
+            margin-top: 8px;
+        }
+
+        .connection-alert {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 16px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .connection-alert.show {
+            display: block;
+        }
+
+        .interpolated-badge {
+            background: linear-gradient(135deg, rgba(74, 222, 128, 0.2), rgba(102, 126, 234, 0.2));
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .interpolated-badge span {
+            color: #4ade80;
+            font-weight: bold;
+        }
+
+        .config-editor {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 16px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .config-editor h4 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .config-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .config-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 12px;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .config-item label {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.6);
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .config-value {
+            font-size: 13px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .info-text {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-top: 8px;
+        }
+
+        .accuracy-card {
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.6), rgba(102, 126, 234, 0.1));
+            border: 1px solid rgba(102, 126, 234, 0.3);
+        }
+
+        .accuracy-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #4ade80;
+        }
+
+        .live-badge {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 11px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p id="loadingText"
+            style="background: linear-gradient(135deg, #fff, #667eea); -webkit-background-clip: text; background-clip: text; color: transparent;">
+            Connecting to Firebase...</p>
+    </div>
+
+    <div class="background-animation">
+        <div class="gradient-sphere sphere-1"></div>
+        <div class="gradient-sphere sphere-2"></div>
+        <div class="gradient-sphere sphere-3"></div>
+        <div class="gradient-sphere sphere-4"></div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <div class="logo">
+                    <h1><i class="fas fa-chart-line"></i> ESP32 Triangulation System</h1>
+                    <p>Real-Time Host Movement Tracking | Direction & Speed Monitoring</p>
+                </div>
+                <div class="status-badge">
+                    <div class="status-item">
+                        <div class="status-dot offline" id="firebaseStatus"></div><span>Firebase</span>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-dot offline" id="esp32Status"></div><span>ESP32 Nodes</span>
+                    </div>
+                    <div class="status-item"><i class="fas fa-chart-simple"></i><span id="activeCount">0/3 Active</span>
+                    </div>
+                    <div class="time" id="currentTime"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="connection-alert" id="connectionAlert">
+            <h3><i class="fas fa-exclamation-triangle"></i> Connection Status</h3>
+            <p id="alertMessage">Waiting for data from ESP32 modules...</p>
+        </div>
+
+        <!-- Tower Cards -->
+        <div class="stats-grid">
+            <div class="stat-card no-data" id="towerACard">
+                <div class="card-header">
+                    <h3><i class="fas fa-tower-broadcast"></i> Tower A (ESP32 #1)</h3>
+                    <div class="card-icon blue"><i class="fas fa-signal"></i></div>
+                </div>
+                <div class="rssi-value" id="rssiA">-- dBm</div>
+                <div class="distance-value" id="distanceA">-- m</div>
+                <div class="distance-value" id="distanceCm_A">-- cm</div>
+                <div class="signal-quality" id="qualityA">Waiting...</div>
+                <div class="debug-info" id="debugA">Last update: Never</div>
+            </div>
+
+            <div class="stat-card no-data" id="towerBCard">
+                <div class="card-header">
+                    <h3><i class="fas fa-tower-broadcast"></i> Tower B (ESP32 #2)</h3>
+                    <div class="card-icon green"><i class="fas fa-signal"></i></div>
+                </div>
+                <div class="rssi-value" id="rssiB">-- dBm</div>
+                <div class="distance-value" id="distanceB">-- m</div>
+                <div class="distance-value" id="distanceCm_B">-- cm</div>
+                <div class="signal-quality" id="qualityB">Waiting...</div>
+                <div class="debug-info" id="debugB">Last update: Never</div>
+            </div>
+
+            <div class="stat-card no-data" id="towerCCard">
+                <div class="card-header">
+                    <h3><i class="fas fa-tower-broadcast"></i> Tower C (ESP32 #3)</h3>
+                    <div class="card-icon orange"><i class="fas fa-signal"></i></div>
+                </div>
+                <div class="rssi-value" id="rssiC">-- dBm</div>
+                <div class="distance-value" id="distanceC">-- m</div>
+                <div class="distance-value" id="distanceCm_C">-- cm</div>
+                <div class="signal-quality" id="qualityC">Waiting...</div>
+                <div class="debug-info" id="debugC">Last update: Never</div>
+            </div>
+        </div>
+
+        <!-- Host Movement Tracking Card -->
+        <div class="movement-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <h4><i class="fas fa-mobile-alt"></i> HOST MOVEMENT TRACKING</h4>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 5px;">Real-time from RSSI
+                        trilateration</div>
+                </div>
+                <div class="live-badge"><span class="live-dot"></span> LIVE TRACKING</div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px;">
+                <div style="text-align: center;">
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.6);">MOVEMENT DIRECTION</div>
+                    <div class="movement-value" id="movementDirection" style="font-size: 32px;">--</div>
+                    <div id="directionArrow" style="font-size: 28px;">➡️</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.6);">DISTANCE MOVED</div>
+                    <div class="movement-value" id="distanceMoved">--</div>
+                    <div style="font-size: 11px;">meters since last update</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.6);">MOVEMENT SPEED</div>
+                    <div class="movement-value" id="movementSpeed">--</div>
+                    <div style="font-size: 11px;">meters per second</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controlled Mobile Position Badge -->
+        <div class="interpolated-badge">
+            <i class="fas fa-map-pin"></i> <strong>🎯 Current Host Position (Calculated from RSSI):</strong>
+            <span id="interpolatedX">--</span> m, <span id="interpolatedY">--</span> m
+            <span class="live-badge"><span class="live-dot"></span> REAL-TIME</span>
+        </div>
+
+        <!-- Accuracy Cards -->
+        <div class="distances-grid">
+            <div class="distance-card accuracy-card">
+                <h4><i class="fas fa-chart-line"></i> RSSI Quality Score</h4>
+                <div class="accuracy-value" id="accuracyScore">--</div>
+                <div class="unit">%</div>
+            </div>
+            <div class="distance-card accuracy-card">
+                <h4><i class="fas fa-ruler-combined"></i> Position Confidence</h4>
+                <div class="accuracy-value" id="errorEstimate">--</div>
+                <div class="unit">/100</div>
+            </div>
+            <div class="distance-card accuracy-card">
+                <h4><i class="fas fa-waveform"></i> Avg Signal Strength</h4>
+                <div class="accuracy-value" id="avgRSSI">--</div>
+                <div class="unit">dBm</div>
+            </div>
+            <div class="distance-card accuracy-card">
+                <h4><i class="fas fa-chart-simple"></i> Signal Stability</h4>
+                <div class="accuracy-value" id="signalStability">--</div>
+                <div class="unit">%</div>
+            </div>
+        </div>
+
+        <!-- Distance Cards -->
+        <div class="distances-grid">
+            <div class="distance-card">
+                <h4><i class="fas fa-arrow-right"></i> A ↔ B (Fixed)</h4>
+                <div class="value" id="distAB">--</div>
+                <div class="unit">m</div>
+            </div>
+            <div class="distance-card">
+                <h4><i class="fas fa-arrow-right"></i> B ↔ C (Fixed)</h4>
+                <div class="value" id="distBC">--</div>
+                <div class="unit">m</div>
+            </div>
+            <div class="distance-card">
+                <h4><i class="fas fa-arrow-right"></i> C ↔ A (Fixed)</h4>
+                <div class="value" id="distCA">--</div>
+                <div class="unit">m</div>
+            </div>
+            <div class="distance-card">
+                <h4><i class="fas fa-chart-line"></i> Triangle Perimeter</h4>
+                <div class="value" id="perimeter">--</div>
+                <div class="unit">m</div>
+            </div>
+            <div class="distance-card">
+                <h4><i class="fas fa-mobile-alt"></i> RSSI: A → Host</h4>
+                <div class="value" id="mobileDistA">--</div>
+                <div class="unit">m</div>
+            </div>
+            <div class="distance-card">
+                <h4><i class="fas fa-mobile-alt"></i> RSSI: B → Host</h4>
+                <div class="value" id="mobileDistB">--</div>
+                <div class="unit">m</div>
+            </div>
+            <div class="distance-card">
+                <h4><i class="fas fa-mobile-alt"></i> RSSI: C → Host</h4>
+                <div class="value" id="mobileDistC">--</div>
+                <div class="unit">m</div>
+            </div>
+            <div class="distance-card">
+                <h4><i class="fas fa-trophy"></i> Strongest Tower</h4>
+                <div class="value" id="bestSignal">--</div>
+                <div class="unit">tower</div>
+            </div>
+        </div>
+
+        <!-- Distance Matrix -->
+        <div class="matrix-section">
+            <div class="matrix-title"><i class="fas fa-table"></i> Distance Matrix (meters)</div>
+            <div class="distance-matrix" id="distanceMatrix"></div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <div class="map-container">
+                <div class="map-header">
+                    <div class="map-title"><i class="fas fa-map-marked-alt"></i> Live Triangulation Map</div>
+                    <div class="map-controls">
+                        <button class="map-btn" onclick="zoomIn()"><i class="fas fa-plus"></i> Zoom</button>
+                        <button class="map-btn" onclick="zoomOut()"><i class="fas fa-minus"></i> Zoom</button>
+                        <button class="map-btn" onclick="resetView()"><i class="fas fa-home"></i> Reset</button>
+                        <button class="map-btn" onclick="toggleFullscreen()"><i class="fas fa-expand"></i> Full</button>
+                        <button class="map-btn" id="panModeBtn" onclick="togglePanMode()"><i
+                                class="fas fa-hand-paper"></i> Pan</button>
+                        <span class="zoom-info" id="zoomLevel">Zoom: 100%</span>
+                    </div>
+                </div>
+                <div class="map-canvas-wrapper" id="canvasWrapper">
+                    <canvas id="triangulationCanvas" width="800" height="700"></canvas>
+                </div>
+                <div style="margin-top: 15px; text-align: center; font-size: 13px;">
+                    <i class="fas fa-map-marker-alt"
+                        style="color: #ef4444; animation: blink 1s ease-in-out infinite;"></i>
+                    <span id="positionDisplay">📍 Host Position: Calculating from RSSI...</span>
+                </div>
+
+                <div class="config-editor">
+                    <h4><i class="fas fa-sliders-h"></i> Firebase Configuration (Real-time)</h4>
+                    <div class="config-grid">
+                        <div class="config-item"><label><i class="fas fa-chart-line"></i> RSSI Calibration</label>
+                            <div class="config-value" id="configRSSI">A: -42, n: 2.5</div>
+                        </div>
+                        <div class="config-item"><label><i class="fas fa-tower-broadcast"></i> Tower Positions</label>
+                            <div class="config-value" id="towerPosDisplay">A: (0,0), B: (4,0), C: (2,3)</div>
+                        </div>
+                    </div>
+                    <div class="info-text"><i class="fas fa-info-circle"></i> Host position calculated in real-time from
+                        ESP32 RSSI data</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="map-title"><i class="fas fa-chart-line"></i> RSSI History (Last 20 updates)</div>
+                <canvas id="rssiChart" width="500" height="400"
+                    style="width:100%; height:auto; max-height:400px;"></canvas>
+            </div>
+        </div>
+
+        <!-- Device Status -->
+        <div class="device-status">
+            <div class="map-title"><i class="fas fa-microchip"></i> Device Status</div>
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Device</th>
+                        <th>Status</th>
+                        <th>X</th>
+                        <th>Y</th>
+                        <th>Distance to Host</th>
+                        <th>Last Update</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>.<td>Tower A</span></td>
+                        <td class="device-offline" id="statusA">● Offline</span></td>
+                        <td id="posX_A">0</span>
+                        <td>
+                        <td id="posY_A">0</span>
+                        <td>
+                        <td id="mobileDistTableA">--</span></td>
+                        <td id="timeA">--</span>
+                    </tr>
+                    <tr>.<td>Tower B</span></td>
+                        <td class="device-offline" id="statusB">● Offline</span></td>
+                        <td id="posX_B">4</span>
+                        <td>
+                        <td id="posY_B">0</span>
+                        <td>
+                        <td id="mobileDistTableB">--</span></td>
+                        <td id="timeB">--</span>
+                    </tr>
+                    <tr>.<td>Tower C</span></td>
+                        <td class="device-offline" id="statusC">● Offline</span></td>
+                        <td id="posX_C">2</span>
+                        <td>
+                        <td id="posY_C">3</span>
+                        <td>
+                        <td id="mobileDistTableC">--</span></td>
+                        <td id="timeC">--</span>
+                    </tr>
+                    <tr>.<td>📱 Host Device</span></td>
+                        <td class="device-online" id="interpStatus">● Tracking</span></td>
+                        <td id="targetX">--</span>
+                        <td>
+                        <td id="targetY">--</span>
+                        <td>
+                        <td>--</span></td>
+                        <td id="targetTime">--</span>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="logs-section">
+            <div class="map-title"><i class="fas fa-history"></i> Live System Logs</div>
+            <div class="logs-container" id="logsContainer">
+                <div class="log-entry"><span class="log-time">[System]</span> Dashboard ready. Tracking host movement in
+                    real-time...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== Firebase Configuration ==========
+        const firebaseConfig = {
+            apiKey: "AIzaSyC1w-4gd_En42m4DObFs1JM8rCSYsj9BXM",
+            authDomain: "triangulation-4be54.firebaseapp.com",
+            databaseURL: "https://triangulation-4be54-default-rtdb.firebaseio.com",
+            projectId: "triangulation-4be54",
+            storageBucket: "triangulation-4be54.firebasestorage.app",
+            messagingSenderId: "743532804404",
+            appId: "1:743532804404:web:b20fbee10f1ff849e04d61"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // ========== Dynamic Configuration ==========
+        let towerPositions = { A: { x: 0, y: 0 }, B: { x: 4, y: 0 }, C: { x: 2, y: 3 } };
+        let hostPosition = { x: null, y: null };
+        let previousHostPosition = { x: null, y: null };
+        let lastMovementTime = Date.now();
+        let rssiConfig = { A: -42, B: -42, C: -42, n: 2.5 };
+
+        // ========== Map Variables ==========
+        let canvas, ctx;
+        let scale = 65;
+        let offsetX = 300;
+        let offsetY = 100;
+        let isPanning = false;
+        let isPanMode = false;
+        let lastX, lastY;
+        let blinkFrame = 0;
+        let espToEspDistances = { AB: 0, BC: 0, CA: 0 };
+
+        let towerData = {
+            A: { rssi: null, distance: null, distanceCm: null, timestamp: null, lastSeen: null },
+            B: { rssi: null, distance: null, distanceCm: null, timestamp: null, lastSeen: null },
+            C: { rssi: null, distance: null, distanceCm: null, timestamp: null, lastSeen: null }
+        };
+
+        let rssiHistory = { A: [], B: [], C: [] };
+        let chartInstance = null;
+        let activeNodes = 0;
+        let movementLogCount = 0;
+
+        // ========== Helper Functions ==========
+        function getDirection(prevX, prevY, currX, currY) {
+            if (prevX === null || prevY === null) return "Waiting...";
+            const dx = currX - prevX;
+            const dy = currY - prevY;
+            if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) return "Stationary";
+
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            if (angle >= -22.5 && angle < 22.5) return "→ East";
+            if (angle >= 22.5 && angle < 67.5) return "↗ North-East";
+            if (angle >= 67.5 && angle < 112.5) return "↑ North";
+            if (angle >= 112.5 && angle < 157.5) return "↖ North-West";
+            if (angle >= -67.5 && angle < -22.5) return "↘ South-East";
+            if (angle >= -112.5 && angle < -67.5) return "↓ South";
+            if (angle >= -157.5 && angle < -112.5) return "↙ South-West";
+            return "← West";
+        }
+
+        function getDirectionArrow(prevX, prevY, currX, currY) {
+            if (prevX === null || prevY === null) return "⏺";
+            const dx = currX - prevX;
+            const dy = currY - prevY;
+            if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) return "●";
+
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            if (angle >= -22.5 && angle < 22.5) return "➡️";
+            if (angle >= 22.5 && angle < 67.5) return "↗️";
+            if (angle >= 67.5 && angle < 112.5) return "⬆️";
+            if (angle >= 112.5 && angle < 157.5) return "↖️";
+            if (angle >= -67.5 && angle < -22.5) return "↘️";
+            if (angle >= -112.5 && angle < -67.5) return "⬇️";
+            if (angle >= -157.5 && angle < -112.5) return "↙️";
+            return "⬅️";
+        }
+
+        function getSignalQuality(rssi) {
+            if (!rssi) return { text: 'No data', class: 'quality-poor' };
+            if (rssi > -50) return { text: 'Excellent', class: 'quality-excellent' };
+            if (rssi > -60) return { text: 'Good', class: 'quality-good' };
+            if (rssi > -70) return { text: 'Fair', class: 'quality-fair' };
+            return { text: 'Poor', class: 'quality-poor' };
+        }
+
+        function addLog(msg, type = 'info') {
+            const logs = document.getElementById('logsContainer');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            const now = new Date();
+            let className = type === 'error' ? 'log-error' : (type === 'success' ? 'log-success' : (type === 'movement' ? 'log-movement' : ''));
+            entry.innerHTML = `<span class="log-time">[${now.toLocaleTimeString()}]</span> <span class="${className}">${msg}</span>`;
+            logs.insertBefore(entry, logs.firstChild);
+            if (logs.children.length > 50) logs.removeChild(logs.lastChild);
+            console.log(msg);
+        }
+
+        function updateTime() { document.getElementById('currentTime').innerHTML = new Date().toLocaleTimeString(); }
+        setInterval(updateTime, 1000);
+
+        function updateESPDistances() {
+            espToEspDistances.AB = Math.hypot(towerPositions.B.x - towerPositions.A.x, towerPositions.B.y - towerPositions.A.y);
+            espToEspDistances.BC = Math.hypot(towerPositions.C.x - towerPositions.B.x, towerPositions.C.y - towerPositions.B.y);
+            espToEspDistances.CA = Math.hypot(towerPositions.A.x - towerPositions.C.x, towerPositions.A.y - towerPositions.C.y);
+            document.getElementById('distAB').innerHTML = espToEspDistances.AB.toFixed(2);
+            document.getElementById('distBC').innerHTML = espToEspDistances.BC.toFixed(2);
+            document.getElementById('distCA').innerHTML = espToEspDistances.CA.toFixed(2);
+            document.getElementById('perimeter').innerHTML = (espToEspDistances.AB + espToEspDistances.BC + espToEspDistances.CA).toFixed(2);
+            document.getElementById('towerPosDisplay').innerHTML = `A:(${towerPositions.A.x},${towerPositions.A.y}), B:(${towerPositions.B.x},${towerPositions.B.y}), C:(${towerPositions.C.x},${towerPositions.C.y})`;
+        }
+
+        function getBestSignalTower() {
+            const signals = [
+                { tower: 'A', rssi: towerData.A.rssi },
+                { tower: 'B', rssi: towerData.B.rssi },
+                { tower: 'C', rssi: towerData.C.rssi }
+            ];
+            const valid = signals.filter(s => s.rssi !== null);
+            if (valid.length === 0) return 'None';
+            const best = valid.reduce((max, curr) => curr.rssi > max.rssi ? curr : max, valid[0]);
+            return best.tower;
+        }
+
+        function trilateration() {
+            const d1 = towerData.A.distance;
+            const d2 = towerData.B.distance;
+            const d3 = towerData.C.distance;
+            if (!d1 || !d2 || !d3) return null;
+
+            const x1 = towerPositions.A.x, y1 = towerPositions.A.y;
+            const x2 = towerPositions.B.x, y2 = towerPositions.B.y;
+            const x3 = towerPositions.C.x, y3 = towerPositions.C.y;
+
+            try {
+                const A = 2 * (x2 - x1), B = 2 * (y2 - y1), C = Math.pow(d1, 2) - Math.pow(d2, 2) - Math.pow(x1, 2) + Math.pow(x2, 2) - Math.pow(y1, 2) + Math.pow(y2, 2);
+                const D = 2 * (x3 - x2), E = 2 * (y3 - y2), F = Math.pow(d2, 2) - Math.pow(d3, 2) - Math.pow(x2, 2) + Math.pow(x3, 2) - Math.pow(y2, 2) + Math.pow(y3, 2);
+                const det = E * A - B * D;
+                if (Math.abs(det) < 0.0001) return null;
+                const x = (C * E - F * B) / det;
+                const y = (C * D - A * F) / (B * D - A * E);
+                return { x: x, y: y };
+            } catch (e) { return null; }
+        }
+
+        function calculateQualityMetrics() {
+            const rssiValues = [towerData.A.rssi, towerData.B.rssi, towerData.C.rssi].filter(v => v !== null);
+            if (rssiValues.length < 3) return { score: 0, confidence: 0, avgRSSI: 0, stability: 0 };
+            const avgRSSI = rssiValues.reduce((a, b) => a + b, 0) / rssiValues.length;
+            const rssiVariance = rssiValues.map(v => Math.pow(v - avgRSSI, 2)).reduce((a, b) => a + b, 0) / rssiValues.length;
+            const stability = Math.max(0, 100 - Math.sqrt(rssiVariance) * 5);
+            let qualityScore = 85;
+            if (avgRSSI < -70) qualityScore -= 35;
+            else if (avgRSSI < -60) qualityScore -= 15;
+            else if (avgRSSI > -50) qualityScore += 5;
+            if (stability < 60) qualityScore -= 15;
+            qualityScore = Math.min(98, Math.max(20, qualityScore));
+            return { score: Math.round(qualityScore), confidence: Math.round(qualityScore), avgRSSI: Math.round(avgRSSI), stability: Math.round(stability) };
+        }
+
+        function updateQualityDisplay() {
+            const q = calculateQualityMetrics();
+            document.getElementById('accuracyScore').innerHTML = q.score;
+            document.getElementById('errorEstimate').innerHTML = q.confidence;
+            document.getElementById('avgRSSI').innerHTML = q.avgRSSI;
+            document.getElementById('signalStability').innerHTML = q.stability;
+        }
+
+        function calculateInterpolatedDistances(mobilePos) {
+            if (!mobilePos.x || !mobilePos.y) return { toA: null, toB: null, toC: null };
+            return {
+                toA: Math.hypot(mobilePos.x - towerPositions.A.x, mobilePos.y - towerPositions.A.y),
+                toB: Math.hypot(mobilePos.x - towerPositions.B.x, mobilePos.y - towerPositions.B.y),
+                toC: Math.hypot(mobilePos.x - towerPositions.C.x, mobilePos.y - towerPositions.C.y)
+            };
+        }
+
+        function updateDistanceMatrix() {
+            const matrixDiv = document.getElementById('distanceMatrix');
+            const interpolated = calculateInterpolatedDistances(hostPosition);
+            matrixDiv.innerHTML = `
+                <div class="matrix-cell header"></div><div class="matrix-cell header">Tower A</div><div class="matrix-cell header">Tower B</div><div class="matrix-cell header">Tower C</div><div class="matrix-cell header">📱 Host</div>
+                <div class="matrix-cell row-header">Tower A</div><div class="matrix-cell diagonal">0</div><div class="matrix-cell">${espToEspDistances.AB.toFixed(2)}</div><div class="matrix-cell">${espToEspDistances.CA.toFixed(2)}</div><div class="matrix-cell interpolated">${interpolated.toA ? interpolated.toA.toFixed(2) : '--'}</div>
+                <div class="matrix-cell row-header">Tower B</div><div class="matrix-cell">${espToEspDistances.AB.toFixed(2)}</div><div class="matrix-cell diagonal">0</div><div class="matrix-cell">${espToEspDistances.BC.toFixed(2)}</div><div class="matrix-cell interpolated">${interpolated.toB ? interpolated.toB.toFixed(2) : '--'}</div>
+                <div class="matrix-cell row-header">Tower C</div><div class="matrix-cell">${espToEspDistances.CA.toFixed(2)}</div><div class="matrix-cell">${espToEspDistances.BC.toFixed(2)}</div><div class="matrix-cell diagonal">0</div><div class="matrix-cell interpolated">${interpolated.toC ? interpolated.toC.toFixed(2) : '--'}</div>
+                <div class="matrix-cell row-header">📱 Host</div><div class="matrix-cell interpolated">${interpolated.toA ? interpolated.toA.toFixed(2) : '--'}</div><div class="matrix-cell interpolated">${interpolated.toB ? interpolated.toB.toFixed(2) : '--'}</div><div class="matrix-cell interpolated">${interpolated.toC ? interpolated.toC.toFixed(2) : '--'}</div><div class="matrix-cell diagonal">0</div>
+            `;
+        }
+
+        function worldToScreen(worldX, worldY) { return { x: offsetX + worldX * scale, y: offsetY - worldY * scale }; }
+
+        function drawMap() {
+            if (!canvas || !ctx) return;
+            const w = canvas.width, h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            // Draw grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.lineWidth = 1;
+            for (let x = -2; x <= 8; x++) {
+                const sx = offsetX + x * scale;
+                if (sx >= 0 && sx <= w) {
+                    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '10px Inter';
+                    ctx.fillText(x + 'm', sx + 3, offsetY + 12);
+                }
+            }
+            for (let y = -2; y <= 7; y++) {
+                const sy = offsetY - y * scale;
+                if (sy >= 0 && sy <= h) {
+                    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke();
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '10px Inter';
+                    ctx.fillText(y + 'm', offsetX - 25, sy + 3);
+                }
+            }
+
+            // Draw towers
+            const towers = [
+                { key: 'A', pos: towerPositions.A, color: '#3b82f6', label: 'A' },
+                { key: 'B', pos: towerPositions.B, color: '#22c55e', label: 'B' },
+                { key: 'C', pos: towerPositions.C, color: '#f97316', label: 'C' }
+            ];
+            const points = towers.map(t => worldToScreen(t.pos.x, t.pos.y));
+
+            ctx.beginPath(); ctx.strokeStyle = 'rgba(102,126,234,0.4)'; ctx.lineWidth = 2; ctx.setLineDash([8, 6]);
+            if (points[0] && points[1]) { ctx.moveTo(points[0].x, points[0].y); ctx.lineTo(points[1].x, points[1].y); ctx.lineTo(points[2].x, points[2].y); ctx.lineTo(points[0].x, points[0].y); }
+            ctx.stroke(); ctx.setLineDash([]);
+
+            towers.forEach(tower => {
+                const screen = worldToScreen(tower.pos.x, tower.pos.y);
+                const hasData = towerData[tower.key].rssi !== null;
+                if (hasData && towerData[tower.key].distance > 0) {
+                    ctx.beginPath(); ctx.arc(screen.x, screen.y, towerData[tower.key].distance * scale, 0, 2 * Math.PI);
+                    ctx.strokeStyle = tower.color + '80'; ctx.fillStyle = tower.color + '15'; ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = tower.color; ctx.font = '9px monospace';
+                    ctx.fillText(`${towerData[tower.key].distance.toFixed(2)}m`, screen.x + 15, screen.y - 10);
+                }
+                ctx.beginPath(); ctx.arc(screen.x, screen.y, 14, 0, 2 * Math.PI);
+                ctx.fillStyle = hasData ? tower.color : 'rgba(128,128,128,0.5)'; ctx.fill();
+                ctx.fillStyle = 'white'; ctx.font = 'bold 16px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(tower.label, screen.x, screen.y);
+                if (hasData) { ctx.font = '8px monospace'; ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillText(`${towerData[tower.key].rssi} dBm`, screen.x, screen.y + 25); }
+            });
+
+            // Draw Host position (RED BLINKING DOT)
+            if (hostPosition.x !== null && hostPosition.y !== null) {
+                const screen = worldToScreen(hostPosition.x, hostPosition.y);
+                blinkFrame = (blinkFrame + 0.12) % (Math.PI * 2);
+                const pulseScale = 1 + Math.sin(blinkFrame * 3) * 0.15;
+
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ef4444';
+                ctx.beginPath(); ctx.arc(screen.x, screen.y, 16 * pulseScale, 0, 2 * Math.PI);
+                ctx.strokeStyle = `rgba(239,68,68,${0.6 + Math.sin(blinkFrame) * 0.3})`; ctx.lineWidth = 2.5; ctx.stroke();
+                ctx.beginPath(); ctx.arc(screen.x, screen.y, 20 * (1 + Math.sin(blinkFrame * 2) * 0.1), 0, 2 * Math.PI);
+                ctx.strokeStyle = `rgba(239,68,68,${0.3 + Math.sin(blinkFrame * 2) * 0.2})`; ctx.lineWidth = 1.5; ctx.stroke();
+                ctx.beginPath(); ctx.arc(screen.x, screen.y, 11 * pulseScale, 0, 2 * Math.PI);
+                ctx.fillStyle = `rgba(239,68,68,0.85)`; ctx.fill();
+                ctx.beginPath(); ctx.arc(screen.x, screen.y, 7 * pulseScale, 0, 2 * Math.PI);
+                ctx.fillStyle = '#ef4444'; ctx.fill();
+                ctx.beginPath(); ctx.arc(screen.x, screen.y, 3 * pulseScale, 0, 2 * Math.PI);
+                ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fill();
+                ctx.restore();
+
+                ctx.font = '10px monospace'; ctx.fillStyle = '#ef4444';
+                ctx.fillText(`📍 (${hostPosition.x.toFixed(2)}m, ${hostPosition.y.toFixed(2)}m)`, screen.x + 18, screen.y - 12);
+
+                // Dashed lines to towers
+                ctx.setLineDash([5, 5]); ctx.strokeStyle = `rgba(239,68,68,0.4)`; ctx.lineWidth = 1.5;
+                towers.forEach(tower => {
+                    const towerScreen = worldToScreen(tower.pos.x, tower.pos.y);
+                    ctx.beginPath(); ctx.moveTo(screen.x, screen.y); ctx.lineTo(towerScreen.x, towerScreen.y); ctx.stroke();
+                });
+                ctx.setLineDash([]);
+
+                const interpolated = calculateInterpolatedDistances(hostPosition);
+                towers.forEach((tower, idx) => {
+                    const towerScreen = worldToScreen(tower.pos.x, tower.pos.y);
+                    const midX = (screen.x + towerScreen.x) / 2, midY = (screen.y + towerScreen.y) / 2;
+                    ctx.fillStyle = '#ef4444'; ctx.font = '8px monospace';
+                    const dist = idx === 0 ? interpolated.toA : idx === 1 ? interpolated.toB : interpolated.toC;
+                    ctx.fillText(`${dist.toFixed(2)}m`, midX, midY - 5);
+                });
+            }
+            document.getElementById('zoomLevel').innerHTML = `Zoom: ${Math.round(scale / 65 * 100)}%`;
+        }
+
+        // Map Controls
+        function zoomIn() { scale = Math.min(scale + 10, 150); drawMap(); }
+        function zoomOut() { scale = Math.max(scale - 10, 30); drawMap(); }
+        function resetView() { scale = 65; offsetX = canvas.width / 2 - 3 * scale; offsetY = canvas.height - 0.5 * scale; drawMap(); }
+        function toggleFullscreen() { const container = document.querySelector('.map-container'); if (!document.fullscreenElement) container.requestFullscreen(); else document.exitFullscreen(); }
+        function togglePanMode() { isPanMode = !isPanMode; const btn = document.getElementById('panModeBtn'); if (isPanMode) { btn.classList.add('active'); canvas.style.cursor = 'grab'; addLog('✋ Pan mode enabled'); } else { btn.classList.remove('active'); canvas.style.cursor = 'default'; addLog('👆 Pan mode disabled'); } }
+
+        function setupPanEvents() {
+            canvas.addEventListener('mousedown', (e) => { if (!isPanMode) return; isPanning = true; lastX = e.clientX; lastY = e.clientY; canvas.style.cursor = 'grabbing'; });
+            window.addEventListener('mousemove', (e) => { if (!isPanning || !isPanMode) return; offsetX += e.clientX - lastX; offsetY += e.clientY - lastY; lastX = e.clientX; lastY = e.clientY; drawMap(); });
+            window.addEventListener('mouseup', () => { isPanning = false; if (canvas) canvas.style.cursor = isPanMode ? 'grab' : 'default'; });
+            canvas.addEventListener('wheel', (e) => { e.preventDefault(); scale = Math.min(Math.max(scale * (e.deltaY > 0 ? 0.9 : 1.1), 30), 150); drawMap(); });
+        }
+
+        function updateChart() {
+            const ctxChart = document.getElementById('rssiChart').getContext('2d');
+            const labels = Array.from({ length: 20 }, (_, i) => `-${19 - i}s`);
+            if (chartInstance) {
+                chartInstance.data.datasets[0].data = rssiHistory.A.slice(-20);
+                chartInstance.data.datasets[1].data = rssiHistory.B.slice(-20);
+                chartInstance.data.datasets[2].data = rssiHistory.C.slice(-20);
+                chartInstance.update('none');
+            } else {
+                chartInstance = new Chart(ctxChart, {
+                    type: 'line', data: {
+                        labels, datasets: [
+                            { label: 'Tower A', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.4, fill: true, pointRadius: 2 },
+                            { label: 'Tower B', data: [], borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', tension: 0.4, fill: true, pointRadius: 2 },
+                            { label: 'Tower C', data: [], borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.1)', tension: 0.4, fill: true, pointRadius: 2 }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: true, animation: false,
+                        plugins: { legend: { labels: { color: '#fff', font: { size: 10 } } } },
+                        scales: {
+                            y: { title: { display: true, text: 'RSSI (dBm)', color: '#fff' }, ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                            x: { title: { display: true, text: 'Time', color: '#fff' }, ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                        }
+                    }
+                });
+            }
+        }
+
+        function updateMovementTracking() {
+            if (hostPosition.x !== null && hostPosition.y !== null) {
+                const now = Date.now();
+                const timeDiff = (now - lastMovementTime) / 1000;
+
+                if (previousHostPosition.x !== null && previousHostPosition.y !== null) {
+                    const distance = Math.hypot(hostPosition.x - previousHostPosition.x, hostPosition.y - previousHostPosition.y);
+                    const direction = getDirection(previousHostPosition.x, previousHostPosition.y, hostPosition.x, hostPosition.y);
+                    const directionArrow = getDirectionArrow(previousHostPosition.x, previousHostPosition.y, hostPosition.x, hostPosition.y);
+                    const speed = timeDiff > 0 ? distance / timeDiff : 0;
+
+                    document.getElementById('movementDirection').innerHTML = direction;
+                    document.getElementById('directionArrow').innerHTML = directionArrow;
+                    document.getElementById('distanceMoved').innerHTML = distance.toFixed(3);
+                    document.getElementById('movementSpeed').innerHTML = speed.toFixed(2);
+
+                    if (distance > 0.05) {
+                        addLog(`🚶 Host moved ${distance.toFixed(2)}m ${direction} (${speed.toFixed(2)} m/s)`, 'movement');
+                    }
+                }
+                previousHostPosition = { x: hostPosition.x, y: hostPosition.y };
+                lastMovementTime = now;
+            }
+        }
+
+        function updateDashboard() {
+            ['A', 'B', 'C'].forEach(tower => {
+                const data = towerData[tower];
+                if (data.rssi !== null) {
+                    document.getElementById(`tower${tower}Card`).classList.remove('no-data');
+                    document.getElementById(`rssi${tower}`).innerHTML = data.rssi + ' dBm';
+                    document.getElementById(`distance${tower}`).innerHTML = (data.distance || 0).toFixed(2) + ' m';
+                    document.getElementById(`distanceCm_${tower}`).innerHTML = ((data.distance || 0) * 100).toFixed(0) + ' cm';
+                    const q = getSignalQuality(data.rssi);
+                    document.getElementById(`quality${tower}`).innerHTML = q.text;
+                    document.getElementById(`quality${tower}`).className = `signal-quality ${q.class}`;
+                    if (data.timestamp) document.getElementById(`time${tower}`).innerHTML = new Date(data.timestamp * 1000).toLocaleTimeString();
+                    document.getElementById(`status${tower}`).innerHTML = '● Online';
+                    document.getElementById(`status${tower}`).className = 'device-online';
+                    document.getElementById(`mobileDistTable${tower}`).innerHTML = (data.distance || 0).toFixed(2) + ' m';
+                }
+            });
+
+            document.getElementById('mobileDistA').innerHTML = towerData.A.distance ? towerData.A.distance.toFixed(2) : '--';
+            document.getElementById('mobileDistB').innerHTML = towerData.B.distance ? towerData.B.distance.toFixed(2) : '--';
+            document.getElementById('mobileDistC').innerHTML = towerData.C.distance ? towerData.C.distance.toFixed(2) : '--';
+            document.getElementById('bestSignal').innerHTML = getBestSignalTower();
+
+            const pos = trilateration();
+            if (pos) {
+                hostPosition = pos;
+                document.getElementById('positionDisplay').innerHTML = `📍 Host Position: X=${pos.x.toFixed(2)}m, Y=${pos.y.toFixed(2)}m`;
+                document.getElementById('targetX').innerHTML = pos.x.toFixed(2);
+                document.getElementById('targetY').innerHTML = pos.y.toFixed(2);
+                document.getElementById('interpStatus').innerHTML = '● Tracking';
+                document.getElementById('interpStatus').className = 'device-online';
+                document.getElementById('targetTime').innerHTML = new Date().toLocaleTimeString();
+                document.getElementById('interpolatedX').innerHTML = pos.x.toFixed(2);
+                document.getElementById('interpolatedY').innerHTML = pos.y.toFixed(2);
+
+                updateMovementTracking();
+            } else {
+                document.getElementById('interpolatedX').innerHTML = '--';
+                document.getElementById('interpolatedY').innerHTML = '--';
+                if (activeNodes < 3) document.getElementById('positionDisplay').innerHTML = `⏳ Need 3 towers (${activeNodes}/3)`;
+            }
+
+            updateDistanceMatrix();
+            updateQualityDisplay();
+            drawMap();
+
+            activeNodes = Object.values(towerData).filter(t => t.rssi !== null).length;
+            document.getElementById('activeCount').innerHTML = `${activeNodes}/3 Active`;
+            document.getElementById('esp32Status').className = activeNodes > 0 ? 'status-dot online' : 'status-dot offline';
+
+            const alertDiv = document.getElementById('connectionAlert');
+            if (activeNodes === 0) { alertDiv.classList.add('show'); document.getElementById('alertMessage').innerHTML = '⏳ Waiting for ESP32 data...'; }
+            else if (activeNodes < 3) { alertDiv.classList.add('show'); document.getElementById('alertMessage').innerHTML = `⚠️ Only ${activeNodes}/3 nodes active - Need all 3 for trilateration`; }
+            else { alertDiv.classList.remove('show'); }
+        }
+
+        function processTowerData(tower, data) {
+            if (!data) return;
+            towerData[tower] = { rssi: data.rssi, distance: data.distance_m, distanceCm: data.distance_cm, timestamp: data.timestamp, lastSeen: Date.now() };
+            if (data.rssi) { rssiHistory[tower].push(data.rssi); if (rssiHistory[tower].length > 20) rssiHistory[tower].shift(); }
+            addLog(`📡 Tower ${tower}: RSSI=${data.rssi} dBm, Distance=${data.distance_m}m`);
+            updateDashboard(); updateChart();
+        }
+
+        // ========== Firebase Listeners ==========
+        function setupFirebaseListeners() {
+            addLog('🎧 Setting up Firebase listeners...');
+
+            database.ref('/config/rssi').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    if (data.A !== undefined) rssiConfig.A = data.A;
+                    if (data.B !== undefined) rssiConfig.B = data.B;
+                    if (data.C !== undefined) rssiConfig.C = data.C;
+                    if (data.n !== undefined) rssiConfig.n = data.n;
+                    document.getElementById('configRSSI').innerHTML = `A:${rssiConfig.A}, B:${rssiConfig.B}, C:${rssiConfig.C}, n:${rssiConfig.n}`;
+                    addLog(`📊 RSSI config updated`, 'success');
+                }
+            });
+
+            database.ref('/tower_positions').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    if (data.A) { towerPositions.A = data.A; document.getElementById('posX_A').innerHTML = data.A.x; document.getElementById('posY_A').innerHTML = data.A.y; }
+                    if (data.B) { towerPositions.B = data.B; document.getElementById('posX_B').innerHTML = data.B.x; document.getElementById('posY_B').innerHTML = data.B.y; }
+                    if (data.C) { towerPositions.C = data.C; document.getElementById('posX_C').innerHTML = data.C.x; document.getElementById('posY_C').innerHTML = data.C.y; }
+                    updateESPDistances();
+                    updateDashboard();
+                    drawMap();
+                    addLog(`📍 Tower positions updated`, 'success');
+                }
+            });
+
+            const nodesRef = database.ref('/nodes');
+            nodesRef.once('value', (snapshot) => {
+                const data = snapshot.val();
+                if (!data) { addLog('⚠️ No data in /nodes', 'error'); document.getElementById('loadingOverlay').style.display = 'none'; return; }
+                Object.keys(data).forEach(key => {
+                    const trimmed = key.trim();
+                    let tower = null;
+                    if (trimmed === 'ESP32_NODE_01') tower = 'A';
+                    else if (trimmed === 'ESP32_NODE_02') tower = 'B';
+                    else if (trimmed === 'ESP32_NODE_03') tower = 'C';
+                    if (tower && data[key]) {
+                        processTowerData(tower, data[key]);
+                        database.ref('/nodes/' + key).on('value', (snap) => { if (snap.val()) processTowerData(tower, snap.val()); });
+                    }
+                });
+                document.getElementById('loadingOverlay').style.display = 'none';
+                document.getElementById('firebaseStatus').className = 'status-dot online';
+                addLog('✅ Firebase connected successfully', 'success');
+            });
+        }
+
+        function startAnimation() { function animate() { drawMap(); requestAnimationFrame(animate); } animate(); }
+
+        function init() {
+            canvas = document.getElementById('triangulationCanvas');
+            ctx = canvas.getContext('2d');
+            canvas.width = 800; canvas.height = 700;
+            setupPanEvents();
+            setupFirebaseListeners();
+            updateESPDistances();
+            updateDashboard();
+            startAnimation();
+            addLog('🔴 HOST MOVEMENT TRACKING ACTIVE - Direction & speed monitored in real-time', 'success');
+            addLog('📍 Host position calculated from RSSI trilateration of all 3 towers', 'success');
+        }
+        init();
+    </script>
+</body>
+
+</html>
