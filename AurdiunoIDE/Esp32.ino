@@ -7,8 +7,8 @@
 // ==========================================
 
 // ----- YOUR MOBILE HOTSPOT CREDENTIALS -----
-const char* WIFI_SSID = "Your wifi name";           // Your hotspot name
-const char* WIFI_PASSWORD = "your wifi passwords";    // Your hotspot password
+const char* WIFI_SSID = "<Your_wifi_name>";           // Your hotspot name
+const char* WIFI_PASSWORD = "<your_wifi_password>";    // Your hotspot password
 
 // ----- FIREBASE CONFIGURATION -----
 #define FIREBASE_URL "https://triangulation-4be54-default-rtdb.firebaseio.com"
