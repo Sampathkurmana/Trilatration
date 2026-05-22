@@ -1,8 +1,8 @@
-# Wi‑Fi RSSI-Based Indoor Localization System Using ESP32
+# Wi‑Fi RSSI-Based Triangulation Using ESP32
 
 ## Overview
 
-This project implements a **real-time indoor localization system** using:
+This project implements a **real-time mobile Tracking with ISP towers Using Trilatration** using:
 
 * ESP32 Dev Modules
 * Wi‑Fi RSSI (Received Signal Strength Indicator)
